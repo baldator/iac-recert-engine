@@ -1,0 +1,35 @@
+version: "1.0"
+
+repository:
+  url: "https://github.com/example/infrastructure"
+  provider: "github"
+
+auth:
+  provider: "github"
+  token_env: "GITHUB_TOKEN"
+
+global:
+  dry_run: true
+  verbose_logging: true
+  default_base_branch: "main"
+
+patterns:
+  - name: "terraform-prod"
+    description: "Production Terraform"
+    paths:
+      - "terraform/prod/**/*.tf"
+    recertification_days: 180
+    enabled: true
+
+pr_strategy:
+  type: "per_pattern"
+
+assignment:
+  strategy: "last_committer"
+  fallback_assignees:
+    - "devops-team"
+
+pr_template:
+  title: "🔄 Recertification: {pattern_name}"
+  include_file_list: true
+  include_checklist: true

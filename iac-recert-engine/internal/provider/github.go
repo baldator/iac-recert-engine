@@ -3,13 +3,12 @@ package provider
 import (
 	"context"
 	"fmt"
-	"net/http"
 	"os"
 	"strings"
 	"time"
 
-	"github.com/example/iac-recert-engine/internal/config"
-	"github.com/example/iac-recert-engine/internal/types"
+	"github.com/baldator/iac-recert-engine/internal/config"
+	"github.com/baldator/iac-recert-engine/internal/types"
 	"github.com/google/go-github/v57/github"
 	"go.uber.org/zap"
 	"golang.org/x/oauth2"
@@ -86,7 +85,7 @@ func (p *GitHubProvider) GetLastModificationDate(ctx context.Context, filePath s
 
 	commit := commits[0]
 	ts := commit.GetCommit().GetCommitter().GetDate().Time
-	
+
 	c := types.Commit{
 		Hash:      commit.GetSHA(),
 		Author:    commit.GetCommit().GetAuthor().GetName(),
@@ -157,7 +156,7 @@ func (p *GitHubProvider) CreateCommit(ctx context.Context, branch, message strin
 			{SHA: github.String(parentSHA)},
 		},
 	}
-	newCommit, _, err := p.client.Git.CreateCommit(ctx, p.owner, p.repo, commit)
+	newCommit, _, err := p.client.Git.CreateCommit(ctx, p.owner, p.repo, commit, nil)
 	if err != nil {
 		return "", err
 	}

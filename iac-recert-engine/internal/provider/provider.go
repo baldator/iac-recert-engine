@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/example/iac-recert-engine/internal/config"
-	"github.com/example/iac-recert-engine/internal/types"
+	"github.com/baldator/iac-recert-engine/internal/config"
+	"github.com/baldator/iac-recert-engine/internal/types"
 	"go.uber.org/zap"
 )
 

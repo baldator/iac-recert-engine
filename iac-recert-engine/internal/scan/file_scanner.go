@@ -4,9 +4,9 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/baldator/iac-recert-engine/internal/config"
+	"github.com/baldator/iac-recert-engine/internal/types"
 	"github.com/bmatcuk/doublestar/v4"
-	"github.com/example/iac-recert-engine/internal/config"
-	"github.com/example/iac-recert-engine/internal/types"
 	"go.uber.org/zap"
 )
 
@@ -28,9 +28,9 @@ func (s *Scanner) Scan(root string, patterns []config.Pattern) ([]types.FileInfo
 		}
 
 		for _, pathPattern := range pattern.Paths {
-			// Handle exclusions in the pattern config (if any, though doublestar handles ! in pattern string too, 
+			// Handle exclusions in the pattern config (if any, though doublestar handles ! in pattern string too,
 			// but config has separate Exclude list)
-			
+
 			fullPattern := filepath.Join(root, pathPattern)
 			matches, err := doublestar.FilepathGlob(fullPattern)
 			if err != nil {
@@ -53,7 +53,7 @@ func (s *Scanner) Scan(root string, patterns []config.Pattern) ([]types.FileInfo
 					continue
 				}
 
-				// Check if already seen to avoid duplicates across patterns (or maybe we want them? 
+				// Check if already seen to avoid duplicates across patterns (or maybe we want them?
 				// Spec says "Validation to avoid files appearing in multiple groups", but here we just list them.
 				// Let's deduplicate by path for now, or maybe we return a map of file -> pattern?
 				// The prompt says "Return []FileInfo".

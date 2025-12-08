@@ -12,8 +12,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/example/iac-recert-engine/internal/config"
-	"github.com/example/iac-recert-engine/internal/types"
+	"github.com/baldator/iac-recert-engine/internal/config"
+	"github.com/baldator/iac-recert-engine/internal/types"
 	"go.uber.org/zap"
 )
 
@@ -117,7 +117,7 @@ func (p *AzureDevOpsProvider) GetRepository(ctx context.Context, url string) (*R
 func (p *AzureDevOpsProvider) GetLastModificationDate(ctx context.Context, filePath string) (time.Time, types.Commit, error) {
 	// GET /git/repositories/{repositoryId}/commits?searchCriteria.itemPath={filePath}&$top=1
 	path := fmt.Sprintf("git/repositories/%s/commits?searchCriteria.itemPath=%s&$top=1&api-version=7.0", p.repo, filePath)
-	
+
 	var result struct {
 		Count int `json:"count"`
 		Value []struct {

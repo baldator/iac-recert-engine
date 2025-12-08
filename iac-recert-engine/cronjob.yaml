@@ -1,0 +1,30 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: iac-recert-engine
+spec:
+  schedule: "0 2 * * 0" # Weekly on Sunday at 2am
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: ice
+            image: iac-recert-engine:latest
+            args:
+            - run
+            env:
+            - name: GITHUB_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: ice-secrets
+                  key: github-token
+            volumeMounts:
+            - name: config-volume
+              mountPath: /app/config.yaml
+              subPath: config.yaml
+          volumes:
+          - name: config-volume
+            configMap:
+              name: ice-config
+          restartPolicy: OnFailure

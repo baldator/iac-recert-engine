@@ -1,0 +1,100 @@
+# ICE Configuration Example
+# This file documents all available configuration options.
+
+version: "1.0"
+
+# Repository settings
+repository:
+  # URL of the repository to scan. Supports GitHub, Azure DevOps, and GitLab.
+  url: "https://github.com/example/infrastructure"
+  # Provider type: github, azure, or gitlab
+  provider: "github"
+
+# Authentication settings
+auth:
+  provider: "github"
+  # Environment variable containing the personal access token (PAT)
+  token_env: "GITHUB_TOKEN"
+
+# Global settings
+global:
+  # If true, no PRs will be created (read-only mode)
+  dry_run: false
+  # Enable debug logging
+  verbose_logging: true
+  # Maximum number of concurrent PRs to create (default: 5)
+  max_concurrent_prs: 5
+  # Base branch for PRs (default: main)
+  default_base_branch: "main"
+
+# File patterns to scan
+patterns:
+  - name: "terraform-prod"
+    description: "Production Terraform configurations"
+    paths:
+      # Glob patterns to include
+      - "terraform/prod/**/*.tf"
+      - "!terraform/prod/modules/**" # Exclude modules
+    exclude:
+      # Glob patterns to exclude
+      - "**/*.test.tf"
+    # Number of days before recertification is required
+    recertification_days: 180
+    enabled: true
+
+  - name: "k8s-manifests"
+    description: "Kubernetes Manifests"
+    paths:
+      - "k8s/**/*.yaml"
+    recertification_days: 90
+    enabled: true
+
+# PR Grouping Strategy
+# Options: per_file, per_pattern, per_committer, single_pr, plugin
+pr_strategy:
+  type: "per_pattern"
+  # max_files_per_pr: 50 # Optional limit
+
+# Assignment Strategy
+# Options: static, last_committer, plugin, composite
+assignment:
+  strategy: "composite"
+  rules:
+    - pattern: "terraform/prod/**"
+      strategy: "static"
+      fallback_assignees: ["infra-team"]
+    - pattern: "k8s/**"
+      strategy: "last_committer"
+  # Default assignees if no rule matches or strategy fails
+  fallback_assignees:
+    - "devops-team"
+
+# Plugin Configuration (Optional)
+plugins:
+  cmdb_assignment:
+    enabled: false
+    type: "assignment"
+    module: "cmdb"
+    config:
+      api_url: "https://cmdb.example.com"
+
+# Schedule (for CronJob generation reference)
+schedule:
+  enabled: true
+  cron: "0 2 * * 0" # Weekly on Sunday at 2am
+
+# PR Template Configuration
+pr_template:
+  title: "🔄 Recertification: {pattern_name}"
+  include_file_list: true
+  include_checklist: true
+  custom_instructions: |
+    Please review these files for security and compliance.
+    If they are no longer needed, please delete them.
+
+# Audit Configuration
+audit:
+  enabled: true
+  storage: "file" # or s3
+  config:
+    path: "audit.log"

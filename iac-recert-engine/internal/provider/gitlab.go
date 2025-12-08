@@ -13,8 +13,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/example/iac-recert-engine/internal/config"
-	"github.com/example/iac-recert-engine/internal/types"
+	"github.com/baldator/iac-recert-engine/internal/config"
+	"github.com/baldator/iac-recert-engine/internal/types"
 	"go.uber.org/zap"
 )
 
@@ -41,7 +41,7 @@ func NewGitLabProvider(ctx context.Context, repoCfg config.RepositoryConfig, aut
 
 	path := strings.TrimPrefix(u.Path, "/")
 	path = strings.TrimSuffix(path, ".git")
-	
+
 	// URL encode the project path for API usage
 	projectID := url.PathEscape(path)
 
@@ -97,10 +97,10 @@ func (p *GitLabProvider) doRequest(ctx context.Context, method, path string, bod
 
 func (p *GitLabProvider) GetRepository(ctx context.Context, url string) (*Repository, error) {
 	var repo struct {
-		Name          string `json:"name"`
+		Name              string `json:"name"`
 		PathWithNamespace string `json:"path_with_namespace"`
-		WebURL        string `json:"web_url"`
-		DefaultBranch string `json:"default_branch"`
+		WebURL            string `json:"web_url"`
+		DefaultBranch     string `json:"default_branch"`
 	}
 
 	if err := p.doRequest(ctx, "GET", fmt.Sprintf("projects/%s", p.project), nil, &repo); err != nil {
@@ -121,11 +121,11 @@ func (p *GitLabProvider) GetLastModificationDate(ctx context.Context, filePath s
 	path := fmt.Sprintf("projects/%s/repository/commits?path=%s&per_page=1", p.project, url.QueryEscape(filePath))
 
 	var commits []struct {
-		ID             string    `json:"id"`
-		AuthorName     string    `json:"author_name"`
-		AuthorEmail    string    `json:"author_email"`
-		Message        string    `json:"message"`
-		CommittedDate  time.Time `json:"committed_date"`
+		ID            string    `json:"id"`
+		AuthorName    string    `json:"author_name"`
+		AuthorEmail   string    `json:"author_email"`
+		Message       string    `json:"message"`
+		CommittedDate time.Time `json:"committed_date"`
 	}
 
 	if err := p.doRequest(ctx, "GET", path, nil, &commits); err != nil {

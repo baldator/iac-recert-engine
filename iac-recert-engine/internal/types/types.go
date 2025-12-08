@@ -15,28 +15,29 @@ type FileInfo struct {
 }
 
 type RecertCheckResult struct {
-	File         FileInfo
-	DaysSince    int
-	Threshold    int
-	Priority     string // Critical, High, Medium, Low
-	NeedsRecert  bool
-	NextDueDate  time.Time
+	File        FileInfo
+	PatternName string
+	DaysSince   int
+	Threshold   int
+	Priority    string // Critical, High, Medium, Low
+	NeedsRecert bool
+	NextDueDate time.Time
 }
 
 type FileGroup struct {
-	ID       string
-	Strategy string
-	Files    []RecertCheckResult
+	ID        string
+	Strategy  string
+	Files     []RecertCheckResult
 	Assignees []string
 	Reviewers []string
 }
 
 type ExecutionResult struct {
-	RunID     string
-	StartTime time.Time
-	EndTime   time.Time
-	Success   bool
-	Errors    []string
+	RunID      string
+	StartTime  time.Time
+	EndTime    time.Time
+	Success    bool
+	Errors     []string
 	PRsCreated []string
 }
 

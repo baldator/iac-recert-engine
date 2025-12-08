@@ -3,10 +3,9 @@ package scan
 import (
 	"context"
 	"path/filepath"
-	"time"
 
-	"github.com/example/iac-recert-engine/internal/provider"
-	"github.com/example/iac-recert-engine/internal/types"
+	"github.com/baldator/iac-recert-engine/internal/provider"
+	"github.com/baldator/iac-recert-engine/internal/types"
 	"go.uber.org/zap"
 )
 

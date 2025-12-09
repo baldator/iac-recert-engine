@@ -12,7 +12,6 @@ FROM alpine:latest
 
 WORKDIR /app
 COPY --from=builder /app/ice .
-COPY config.yaml .
 
 ENTRYPOINT ["./ice"]
 CMD ["run"]

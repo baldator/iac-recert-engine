@@ -17,6 +17,10 @@ var rootCmd = &cobra.Command{
 	Long: `ICE is a tool to automate the recertification of Infrastructure as Code (IaC)
 repositories. It scans for files, checks modification dates, and generates
 pull requests for review.`,
+	CompletionOptions: cobra.CompletionOptions{
+		DisableDefaultCmd: true,
+		HiddenDefaultCmd:  true,
+	},
 	// Uncomment the following line if your bare application
 	// has an action associated with it:
 	// Run: func(cmd *cobra.Command, args []string) { },

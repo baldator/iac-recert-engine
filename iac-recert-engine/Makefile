@@ -5,7 +5,7 @@ BINARY_NAME=ice
 all: build
 
 build:
-	go build -o $(BINARY_NAME) ./cmd/ice/main.go
+	go build -o $(BINARY_NAME) ./cmd/ice
 
 test:
 	go test -v ./...

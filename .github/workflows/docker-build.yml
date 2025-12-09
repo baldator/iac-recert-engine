@@ -23,7 +23,7 @@ jobs:
     - name: Build Docker image
       uses: docker/build-push-action@v5
       with:
-        context: .
+        context: ./iac-recert-engine
         file: ./iac-recert-engine/Dockerfile
         push: true
         tags: ghcr.io/${{ github.repository_owner }}/iac-recert-engine:latest

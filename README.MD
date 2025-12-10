@@ -1,7 +1,6 @@
 # iac-recert-engine
 
 [![Build](https://github.com/baldator/iac-recert-engine/actions/workflows/docker-build.yml/badge.svg)](https://github.com/baldator/iac-recert-engine/actions/workflows/docker-build.yml)
-[![Docker](https://img.shields.io/docker/pulls/baldator/iac-recert-engine)](https://hub.docker.com/r/baldator/iac-recert-engine)
 
 <img src="./resources/iac-recert-engine-logo.png" alt="Project Logo" />
 

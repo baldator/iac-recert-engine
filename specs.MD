@@ -308,10 +308,6 @@ plugins:
       api_url: "${CMDB_API_URL}"
       api_key: "${CMDB_API_KEY}"
 
-schedule:
-  enabled: true
-  cron: "0 2 * * 0"
-
 pr_template:
   title: "🔄 Recertification: {pattern_name}"
   include_file_list: true

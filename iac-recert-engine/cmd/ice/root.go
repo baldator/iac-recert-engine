@@ -49,6 +49,9 @@ func initConfig() {
 	if cfgFile != "" {
 		// Use config file from the flag.
 		viper.SetConfigFile(cfgFile)
+	} else if iceConfigPath := os.Getenv("ICE_CONFIG_PATH"); iceConfigPath != "" {
+		// Use config file from ICE_CONFIG_PATH environment variable.
+		viper.SetConfigFile(iceConfigPath)
 	} else {
 		// Find home directory.
 		home, err := os.UserHomeDir()

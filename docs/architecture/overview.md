@@ -269,7 +269,6 @@ Provides observability:
 - Kubernetes and orchestration friendly
 
 ### Scheduled Service
-- Cron-based execution
 - Kubernetes CronJobs
 - CI/CD pipeline integration
 

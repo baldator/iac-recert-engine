@@ -21,7 +21,6 @@
   - [**💻 Command Line Interface**](usage/cli.md)
   - [**🐳 Docker Usage**](usage/docker.md)
   - [**🔄 CI/CD Integration**](usage/ci-cd.md)
-  - [**⏰ Scheduling**](usage/scheduling.md)
 
 - **Architecture**
   - [**🏗️ System Overview**](architecture/overview.md)

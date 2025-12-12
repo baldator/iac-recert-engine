@@ -30,9 +30,6 @@ assignment:
 plugins:
   # Plugin configurations
 
-schedule:
-  # Scheduling options
-
 pr_template:
   # PR template settings
 
@@ -151,15 +148,6 @@ plugins:
     config:
       api_url: "https://cmdb.example.com"
       api_key: "${CMDB_API_KEY}"
-```
-
-### Schedule Configuration
-Configures automated execution scheduling.
-
-```yaml
-schedule:
-  enabled: true
-  cron: "0 2 * * 0"  # Weekly on Sunday at 2am
 ```
 
 ### PR Template Configuration

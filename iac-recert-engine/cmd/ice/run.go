@@ -61,7 +61,10 @@ func init() {
 	// Cobra supports local flags which will only run when this command
 	// is called directly, e.g.:
 	// runCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
-	
+
 	runCmd.Flags().Bool("dry-run", false, "Run without creating PRs")
 	viper.BindPFlag("global.dry_run", runCmd.Flags().Lookup("dry-run"))
+
+	runCmd.Flags().String("repo-url", "", "Repository URL to scan (overrides config)")
+	viper.BindPFlag("repository.url", runCmd.Flags().Lookup("repo-url"))
 }

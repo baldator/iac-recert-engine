@@ -1,0 +1,79 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - goos: linux
+            goarch: amd64
+            output: ice-linux-amd64
+          - goos: linux
+            goarch: arm64
+            output: ice-linux-arm64
+          - goos: darwin
+            goarch: amd64
+            output: ice-darwin-amd64
+          - goos: darwin
+            goarch: arm64
+            output: ice-darwin-arm64
+          - goos: windows
+            goarch: amd64
+            output: ice-windows-amd64.exe
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.24'
+
+    - name: Build binary
+      run: |
+        cd iac-recert-engine
+        GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} go build \
+          -ldflags "-s -w -X main.version=${{ github.ref_name }}" \
+          -o ${{ matrix.output }} \
+          ./cmd/ice
+
+    - name: Upload binary
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ matrix.output }}
+        path: iac-recert-engine/${{ matrix.output }}
+
+  create-release:
+    needs: build-and-release
+    runs-on: ubuntu-latest
+    steps:
+    - name: Download all artifacts
+      uses: actions/download-artifact@v4
+      with:
+        path: artifacts/
+
+    - name: Create release
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: ${{ github.ref_name }}
+        name: Release ${{ github.ref_name }}
+        draft: false
+        prerelease: false
+        files: |
+          artifacts/ice-linux-amd64/ice-linux-amd64
+          artifacts/ice-linux-arm64/ice-linux-arm64
+          artifacts/ice-darwin-amd64/ice-darwin-amd64
+          artifacts/ice-darwin-arm64/ice-darwin-arm64
+          artifacts/ice-windows-amd64.exe/ice-windows-amd64.exe
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

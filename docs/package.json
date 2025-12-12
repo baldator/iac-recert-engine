@@ -1,0 +1,24 @@
+{
+  "name": "iac-recert-engine-docs",
+  "version": "1.0.0",
+  "description": "Documentation for IaC Recertification Engine",
+  "scripts": {
+    "serve": "gitbook serve",
+    "build": "gitbook build",
+    "install-plugins": "gitbook install",
+    "pdf": "gitbook pdf",
+    "epub": "gitbook epub",
+    "mobi": "gitbook mobi"
+  },
+  "dependencies": {},
+  "devDependencies": {},
+  "engines": {
+    "node": ">=14.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/baldator/iac-recert-engine.git"
+  },
+  "author": "IaC Recertification Engine Team",
+  "license": "MIT"
+}

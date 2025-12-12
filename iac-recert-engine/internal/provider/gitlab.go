@@ -1,12 +1,8 @@
 package provider
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
 	"net/url"
 	"os"
 	"strconv"
@@ -15,14 +11,13 @@ import (
 
 	"github.com/baldator/iac-recert-engine/internal/config"
 	"github.com/baldator/iac-recert-engine/internal/types"
+	gitlab "gitlab.com/gitlab-org/api/client-go"
 	"go.uber.org/zap"
 )
 
 type GitLabProvider struct {
-	client  *http.Client
-	baseURL string
-	token   string
-	project string // Project ID or URL-encoded path
+	client  *gitlab.Client
+	project int64 // Project ID
 	logger  *zap.Logger
 }
 
@@ -42,93 +37,52 @@ func NewGitLabProvider(ctx context.Context, repoCfg config.RepositoryConfig, aut
 	path := strings.TrimPrefix(u.Path, "/")
 	path = strings.TrimSuffix(path, ".git")
 
-	// URL encode the project path for API usage
-	projectID := url.PathEscape(path)
+	// For GitLab, we need the project ID (numeric) or the URL-encoded path
+	// First try to get by path, then extract the ID
+	client, err := gitlab.NewClient(token, gitlab.WithBaseURL(u.Scheme+"://"+u.Host+"/api/v4"))
+	if err != nil {
+		return nil, err
+	}
 
-	baseURL := "https://gitlab.com/api/v4"
-	if u.Host != "gitlab.com" {
-		baseURL = fmt.Sprintf("https://%s/api/v4", u.Host)
+	project, _, err := client.Projects.GetProject(path, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get project: %w", err)
 	}
 
 	return &GitLabProvider{
-		client:  &http.Client{},
-		baseURL: baseURL,
-		token:   token,
-		project: projectID,
+		client:  client,
+		project: project.ID,
 		logger:  logger,
 	}, nil
 }
 
-func (p *GitLabProvider) doRequest(ctx context.Context, method, path string, body interface{}, result interface{}) error {
-	var bodyReader io.Reader
-	if body != nil {
-		jsonBody, err := json.Marshal(body)
-		if err != nil {
-			return err
-		}
-		bodyReader = bytes.NewBuffer(jsonBody)
-	}
-
-	url := fmt.Sprintf("%s/%s", p.baseURL, path)
-	req, err := http.NewRequestWithContext(ctx, method, url, bodyReader)
-	if err != nil {
-		return err
-	}
-
-	req.Header.Set("PRIVATE-TOKEN", p.token)
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := p.client.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode >= 400 {
-		bodyBytes, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("API request failed: %s %s: %s", method, url, string(bodyBytes))
-	}
-
-	if result != nil {
-		return json.NewDecoder(resp.Body).Decode(result)
-	}
-	return nil
-}
 
 func (p *GitLabProvider) GetRepository(ctx context.Context, url string) (*Repository, error) {
-	var repo struct {
-		Name              string `json:"name"`
-		PathWithNamespace string `json:"path_with_namespace"`
-		WebURL            string `json:"web_url"`
-		DefaultBranch     string `json:"default_branch"`
-	}
-
-	if err := p.doRequest(ctx, "GET", fmt.Sprintf("projects/%s", p.project), nil, &repo); err != nil {
+	project, _, err := p.client.Projects.GetProject(p.project, nil)
+	if err != nil {
 		return nil, err
 	}
 
 	return &Repository{
-		Name:          repo.Name,
-		Owner:         repo.PathWithNamespace, // Approximate mapping
-		URL:           repo.WebURL,
+		Name:          project.Name,
+		Owner:         project.PathWithNamespace,
+		URL:           project.WebURL,
 		Provider:      "gitlab",
-		DefaultBranch: repo.DefaultBranch,
+		DefaultBranch: project.DefaultBranch,
 	}, nil
 }
 
 func (p *GitLabProvider) GetLastModificationDate(ctx context.Context, filePath string) (time.Time, types.Commit, error) {
-	// GET /projects/:id/repository/commits?path=...&per_page=1
-	path := fmt.Sprintf("projects/%s/repository/commits?path=%s&per_page=1", p.project, url.QueryEscape(filePath))
-
-	var commits []struct {
-		ID            string    `json:"id"`
-		AuthorName    string    `json:"author_name"`
-		AuthorEmail   string    `json:"author_email"`
-		Message       string    `json:"message"`
-		CommittedDate time.Time `json:"committed_date"`
+	// Use the repository commits API
+	opts := &gitlab.ListCommitsOptions{
+		Path: &filePath,
+		ListOptions: gitlab.ListOptions{
+			PerPage: 1,
+		},
 	}
 
-	if err := p.doRequest(ctx, "GET", path, nil, &commits); err != nil {
+	commits, _, err := p.client.Commits.ListCommits(p.project, opts)
+	if err != nil {
 		return time.Time{}, types.Commit{}, err
 	}
 
@@ -142,71 +96,144 @@ func (p *GitLabProvider) GetLastModificationDate(ctx context.Context, filePath s
 		Author:    c.AuthorName,
 		Email:     c.AuthorEmail,
 		Message:   c.Message,
-		Timestamp: c.CommittedDate,
+		Timestamp: *c.CommittedDate,
 	}
 
-	return c.CommittedDate, commit, nil
+	return *c.CommittedDate, commit, nil
+}
+
+func (p *GitLabProvider) BranchExists(ctx context.Context, name string) (bool, error) {
+	_, _, err := p.client.Branches.GetBranch(p.project, name)
+	if err != nil {
+		if strings.Contains(err.Error(), "404") {
+			return false, nil
+		}
+		return false, err
+	}
+	return true, nil
 }
 
 func (p *GitLabProvider) CreateBranch(ctx context.Context, name, baseRef string) error {
-	return fmt.Errorf("CreateBranch not implemented for GitLab")
+	opts := &gitlab.CreateBranchOptions{
+		Branch: &name,
+		Ref:    &baseRef,
+	}
+	_, _, err := p.client.Branches.CreateBranch(p.project, opts)
+	return err
 }
 
 func (p *GitLabProvider) CreateCommit(ctx context.Context, branch, message string, changes []types.Change) (string, error) {
 	return "", fmt.Errorf("CreateCommit not implemented for GitLab")
 }
 
+func (p *GitLabProvider) PullRequestExists(ctx context.Context, headBranch, baseBranch string) (bool, error) {
+	opts := &gitlab.ListProjectMergeRequestsOptions{
+		SourceBranch: &headBranch,
+		TargetBranch: &baseBranch,
+		State:        &[]string{"opened"}[0],
+		ListOptions: gitlab.ListOptions{
+			PerPage: 1,
+		},
+	}
+
+	mrs, _, err := p.client.MergeRequests.ListProjectMergeRequests(p.project, opts)
+	if err != nil {
+		return false, err
+	}
+
+	return len(mrs) > 0, nil
+}
+
 func (p *GitLabProvider) CreatePullRequest(ctx context.Context, cfg types.PRConfig) (*types.PullRequest, error) {
-	// POST /projects/:id/merge_requests
-	path := fmt.Sprintf("projects/%s/merge_requests", p.project)
-
-	body := map[string]interface{}{
-		"source_branch": cfg.Branch,
-		"target_branch": cfg.BaseBranch,
-		"title":         cfg.Title,
-		"description":   cfg.Description,
+	opts := &gitlab.CreateMergeRequestOptions{
+		SourceBranch: &cfg.Branch,
+		TargetBranch: &cfg.BaseBranch,
+		Title:        &cfg.Title,
+		Description:  &cfg.Description,
 	}
 
-	var mr struct {
-		IID       int       `json:"iid"`
-		WebURL    string    `json:"web_url"`
-		State     string    `json:"state"`
-		CreatedAt time.Time `json:"created_at"`
-	}
-
-	if err := p.doRequest(ctx, "POST", path, body, &mr); err != nil {
+	mr, _, err := p.client.MergeRequests.CreateMergeRequest(p.project, opts)
+	if err != nil {
 		return nil, err
 	}
 
 	return &types.PullRequest{
-		ID:        strconv.Itoa(mr.IID),
+		ID:        strconv.FormatInt(mr.IID, 10),
 		URL:       mr.WebURL,
-		Number:    mr.IID,
+		Number:    int(mr.IID),
 		State:     mr.State,
-		CreatedAt: mr.CreatedAt,
+		CreatedAt: *mr.CreatedAt,
 	}, nil
 }
 
 func (p *GitLabProvider) UpdatePullRequest(ctx context.Context, id string, updates PRUpdate) error {
-	return fmt.Errorf("UpdatePullRequest not implemented for GitLab")
+	mrIID, err := strconv.ParseInt(id, 10, 64)
+	if err != nil {
+		return err
+	}
+
+	opts := &gitlab.UpdateMergeRequestOptions{}
+	if updates.Title != nil {
+		opts.Title = updates.Title
+	}
+	if updates.Description != nil {
+		opts.Description = updates.Description
+	}
+	if updates.State != nil {
+		opts.StateEvent = updates.State
+	}
+
+	_, _, err = p.client.MergeRequests.UpdateMergeRequest(p.project, mrIID, opts)
+	return err
 }
 
 func (p *GitLabProvider) ClosePullRequest(ctx context.Context, id string, reason string) error {
-	return fmt.Errorf("ClosePullRequest not implemented for GitLab")
+	state := "close"
+	return p.UpdatePullRequest(ctx, id, PRUpdate{State: &state})
 }
 
 func (p *GitLabProvider) AssignPullRequest(ctx context.Context, id string, assignees []string) error {
-	return fmt.Errorf("AssignPullRequest not implemented for GitLab")
+	// GitLab supports multiple assignees but the API might be different
+	if len(assignees) > 0 {
+		// We need to get user IDs from usernames
+		// This is a simplified version - in practice you'd need to resolve usernames to IDs
+		return fmt.Errorf("AssignPullRequest: user ID resolution not implemented")
+	}
+	return nil
 }
 
 func (p *GitLabProvider) RequestReviewers(ctx context.Context, id string, reviewers []string) error {
-	return fmt.Errorf("RequestReviewers not implemented for GitLab")
+	// GitLab doesn't have the same reviewer system as GitHub
+	// Reviewers are typically assigned as assignees or mentioned in comments
+	return fmt.Errorf("RequestReviewers not supported for GitLab")
 }
 
 func (p *GitLabProvider) AddLabels(ctx context.Context, id string, labels []string) error {
-	return fmt.Errorf("AddLabels not implemented for GitLab")
+	mrIID, err := strconv.ParseInt(id, 10, 64)
+	if err != nil {
+		return err
+	}
+
+	// Convert labels to LabelOptions
+	labelOpts := gitlab.LabelOptions(labels)
+	opts := &gitlab.UpdateMergeRequestOptions{
+		Labels: &labelOpts,
+	}
+
+	_, _, err = p.client.MergeRequests.UpdateMergeRequest(p.project, mrIID, opts)
+	return err
 }
 
 func (p *GitLabProvider) AddComment(ctx context.Context, id string, comment string) error {
-	return fmt.Errorf("AddComment not implemented for GitLab")
+	mrIID, err := strconv.ParseInt(id, 10, 64)
+	if err != nil {
+		return err
+	}
+
+	opts := &gitlab.CreateMergeRequestNoteOptions{
+		Body: &comment,
+	}
+
+	_, _, err = p.client.Notes.CreateMergeRequestNote(p.project, mrIID, opts)
+	return err
 }

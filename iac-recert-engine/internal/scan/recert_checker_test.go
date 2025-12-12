@@ -2,6 +2,7 @@ package scan
 
 import (
 	"fmt"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -17,7 +18,7 @@ func TestChecker_Check(t *testing.T) {
 	checker := NewChecker(logger)
 
 	now := time.Now()
-	repoRoot := "."
+	repoRoot, _ := filepath.Abs(".")
 
 	tests := []struct {
 		name     string
@@ -29,7 +30,7 @@ func TestChecker_Check(t *testing.T) {
 			name: "needs recertification - critical",
 			files: []types.FileInfo{
 				{
-					Path:         "main.tf",
+					Path:         filepath.Join(repoRoot, "main.tf"),
 					LastModified: now.AddDate(0, 0, -100), // 100 days ago
 				},
 			},
@@ -37,7 +38,7 @@ func TestChecker_Check(t *testing.T) {
 				{
 					Name:                "terraform",
 					Enabled:             true,
-					Paths:               []string{"**/*.tf"},
+					Paths:               []string{"*.tf"},
 					RecertificationDays: 60,
 				},
 			},
@@ -55,7 +56,7 @@ func TestChecker_Check(t *testing.T) {
 			name: "needs recertification - high",
 			files: []types.FileInfo{
 				{
-					Path:         "main.tf",
+					Path:         filepath.Join(repoRoot, "main.tf"),
 					LastModified: now.AddDate(0, 0, -70), // 70 days ago
 				},
 			},
@@ -63,7 +64,7 @@ func TestChecker_Check(t *testing.T) {
 				{
 					Name:                "terraform",
 					Enabled:             true,
-					Paths:               []string{"**/*.tf"},
+					Paths:               []string{"*.tf"},
 					RecertificationDays: 60,
 				},
 			},
@@ -81,7 +82,7 @@ func TestChecker_Check(t *testing.T) {
 			name: "needs recertification - medium",
 			files: []types.FileInfo{
 				{
-					Path:         "main.tf",
+					Path:         filepath.Join(repoRoot, "main.tf"),
 					LastModified: now.AddDate(0, 0, -60), // 60 days ago
 				},
 			},
@@ -89,7 +90,7 @@ func TestChecker_Check(t *testing.T) {
 				{
 					Name:                "terraform",
 					Enabled:             true,
-					Paths:               []string{"**/*.tf"},
+					Paths:               []string{"*.tf"},
 					RecertificationDays: 60,
 				},
 			},
@@ -107,7 +108,7 @@ func TestChecker_Check(t *testing.T) {
 			name: "approaching threshold - medium",
 			files: []types.FileInfo{
 				{
-					Path:         "main.tf",
+					Path:         filepath.Join(repoRoot, "main.tf"),
 					LastModified: now.AddDate(0, 0, -50), // 50 days ago
 				},
 			},
@@ -115,7 +116,7 @@ func TestChecker_Check(t *testing.T) {
 				{
 					Name:                "terraform",
 					Enabled:             true,
-					Paths:               []string{"**/*.tf"},
+					Paths:               []string{"*.tf"},
 					RecertificationDays: 60,
 				},
 			},
@@ -133,7 +134,7 @@ func TestChecker_Check(t *testing.T) {
 			name: "no recertification needed - low",
 			files: []types.FileInfo{
 				{
-					Path:         "main.tf",
+					Path:         filepath.Join(repoRoot, "main.tf"),
 					LastModified: now.AddDate(0, 0, -10), // 10 days ago
 				},
 			},
@@ -141,7 +142,7 @@ func TestChecker_Check(t *testing.T) {
 				{
 					Name:                "terraform",
 					Enabled:             true,
-					Paths:               []string{"**/*.tf"},
+					Paths:               []string{"*.tf"},
 					RecertificationDays: 60,
 				},
 			},
@@ -159,7 +160,7 @@ func TestChecker_Check(t *testing.T) {
 			name: "no match",
 			files: []types.FileInfo{
 				{
-					Path:         "other.txt",
+					Path:         filepath.Join(repoRoot, "other.txt"),
 					LastModified: now.AddDate(0, 0, -100),
 				},
 			},
@@ -167,7 +168,7 @@ func TestChecker_Check(t *testing.T) {
 				{
 					Name:                "terraform",
 					Enabled:             true,
-					Paths:               []string{"**/*.tf"},
+					Paths:               []string{"*.tf"},
 					RecertificationDays: 60,
 				},
 			},

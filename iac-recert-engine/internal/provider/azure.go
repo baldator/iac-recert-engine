@@ -151,6 +151,10 @@ func (p *AzureDevOpsProvider) GetLastModificationDate(ctx context.Context, fileP
 	return c.Author.Date, commit, nil
 }
 
+func (p *AzureDevOpsProvider) BranchExists(ctx context.Context, name string) (bool, error) {
+	return false, fmt.Errorf("BranchExists not implemented for Azure DevOps")
+}
+
 func (p *AzureDevOpsProvider) CreateBranch(ctx context.Context, name, baseRef string) error {
 	// 1. Get base ref
 	// 2. Create ref
@@ -161,6 +165,10 @@ func (p *AzureDevOpsProvider) CreateBranch(ctx context.Context, name, baseRef st
 func (p *AzureDevOpsProvider) CreateCommit(ctx context.Context, branch, message string, changes []types.Change) (string, error) {
 	// Pushes endpoint
 	return "", fmt.Errorf("CreateCommit not implemented for Azure DevOps")
+}
+
+func (p *AzureDevOpsProvider) PullRequestExists(ctx context.Context, headBranch, baseBranch string) (bool, error) {
+	return false, fmt.Errorf("PullRequestExists not implemented for Azure DevOps")
 }
 
 func (p *AzureDevOpsProvider) CreatePullRequest(ctx context.Context, cfg types.PRConfig) (*types.PullRequest, error) {

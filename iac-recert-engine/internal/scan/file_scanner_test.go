@@ -2,6 +2,7 @@ package scan
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"testing"
 
@@ -34,8 +35,15 @@ func TestScanner_Scan(t *testing.T) {
 		require.NoError(t, err)
 	}
 
+	// Initialize git repository
+	require.NoError(t, exec.Command("git", "init", tmpDir).Run())
+	require.NoError(t, exec.Command("git", "-C", tmpDir, "add", ".").Run())
+	require.NoError(t, exec.Command("git", "-C", tmpDir, "config", "user.email", "test@example.com").Run())
+	require.NoError(t, exec.Command("git", "-C", tmpDir, "config", "user.name", "Test User").Run())
+	require.NoError(t, exec.Command("git", "-C", tmpDir, "commit", "-m", "Initial commit").Run())
+
 	logger := zap.NewNop()
-	scanner := NewScanner(logger)
+	scanner := NewScanner(tmpDir, logger)
 
 	tests := []struct {
 		name     string
@@ -52,9 +60,9 @@ func TestScanner_Scan(t *testing.T) {
 				},
 			},
 			want: []string{
-				filepath.Join(tmpDir, "main.tf"),
-				filepath.Join(tmpDir, "modules/vpc/main.tf"),
-				filepath.Join(tmpDir, "modules/vpc/variables.tf"),
+				"main.tf",
+				"modules/vpc/main.tf",
+				"modules/vpc/variables.tf",
 			},
 		},
 		{
@@ -67,7 +75,7 @@ func TestScanner_Scan(t *testing.T) {
 				},
 			},
 			want: []string{
-				filepath.Join(tmpDir, "README.md"),
+				"README.md",
 			},
 		},
 		{
@@ -81,8 +89,8 @@ func TestScanner_Scan(t *testing.T) {
 				},
 			},
 			want: []string{
-				filepath.Join(tmpDir, "main.tf"),
-				filepath.Join(tmpDir, "modules/vpc/main.tf"),
+				"main.tf",
+				"modules/vpc/main.tf",
 			},
 		},
 		{
@@ -100,12 +108,15 @@ func TestScanner_Scan(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := scanner.Scan(tmpDir, tt.patterns)
+			got, scanDir, err := scanner.Scan(tmpDir, tt.patterns)
 			require.NoError(t, err)
+			defer os.RemoveAll(scanDir)
 
 			var gotPaths []string
 			for _, f := range got {
-				gotPaths = append(gotPaths, f.Path)
+				relPath, err := filepath.Rel(scanDir, f.Path)
+				require.NoError(t, err)
+				gotPaths = append(gotPaths, filepath.ToSlash(relPath))
 			}
 
 			assert.ElementsMatch(t, tt.want, gotPaths)

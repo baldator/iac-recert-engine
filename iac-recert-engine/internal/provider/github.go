@@ -22,6 +22,7 @@ type GitHubProvider struct {
 }
 
 func NewGitHubProvider(ctx context.Context, repoCfg config.RepositoryConfig, authCfg config.AuthConfig, logger *zap.Logger) (GitProvider, error) {
+	logger.Debug("NewGitHubProvider called", zap.String("repoURL", repoCfg.URL))
 	token := os.Getenv(authCfg.TokenEnv)
 	if token == "" {
 		return nil, fmt.Errorf("token environment variable %s not set", authCfg.TokenEnv)
@@ -52,10 +53,14 @@ func NewGitHubProvider(ctx context.Context, repoCfg config.RepositoryConfig, aut
 }
 
 func (p *GitHubProvider) GetRepository(ctx context.Context, url string) (*Repository, error) {
+	p.logger.Debug("GetRepository called", zap.String("url", url))
+	p.logger.Info("Getting repository", zap.String("url", url))
 	repo, _, err := p.client.Repositories.Get(ctx, p.owner, p.repo)
 	if err != nil {
+		p.logger.Error("Failed to get repository", zap.Error(err))
 		return nil, err
 	}
+	p.logger.Info("Repository found", zap.String("name", repo.GetName()), zap.String("owner", repo.GetOwner().GetLogin()), zap.String("url", repo.GetHTMLURL()))
 
 	return &Repository{
 		Name:          repo.GetName(),
@@ -67,6 +72,7 @@ func (p *GitHubProvider) GetRepository(ctx context.Context, url string) (*Reposi
 }
 
 func (p *GitHubProvider) GetLastModificationDate(ctx context.Context, filePath string) (time.Time, types.Commit, error) {
+	p.logger.Debug("GetLastModificationDate called", zap.String("filePath", filePath))
 	opts := &github.CommitsListOptions{
 		Path: filePath,
 		ListOptions: github.ListOptions{
@@ -97,7 +103,20 @@ func (p *GitHubProvider) GetLastModificationDate(ctx context.Context, filePath s
 	return ts, c, nil
 }
 
+func (p *GitHubProvider) BranchExists(ctx context.Context, name string) (bool, error) {
+	p.logger.Debug("BranchExists called", zap.String("name", name))
+	_, _, err := p.client.Git.GetRef(ctx, p.owner, p.repo, "refs/heads/"+name)
+	if err != nil {
+		if ghErr, ok := err.(*github.ErrorResponse); ok && ghErr.Response.StatusCode == 404 {
+			return false, nil
+		}
+		return false, err
+	}
+	return true, nil
+}
+
 func (p *GitHubProvider) CreateBranch(ctx context.Context, name, baseRef string) error {
+	p.logger.Debug("CreateBranch called", zap.String("name", name), zap.String("baseRef", baseRef))
 	// Get the reference to the base branch
 	ref, _, err := p.client.Git.GetRef(ctx, p.owner, p.repo, "refs/heads/"+baseRef)
 	if err != nil {
@@ -117,6 +136,7 @@ func (p *GitHubProvider) CreateBranch(ctx context.Context, name, baseRef string)
 }
 
 func (p *GitHubProvider) CreateCommit(ctx context.Context, branch, message string, changes []types.Change) (string, error) {
+	p.logger.Debug("CreateCommit called", zap.String("branch", branch), zap.String("message", message), zap.Int("changes", len(changes)))
 	// 1. Get the latest commit of the branch
 	ref, _, err := p.client.Git.GetRef(ctx, p.owner, p.repo, "refs/heads/"+branch)
 	if err != nil {
@@ -171,7 +191,27 @@ func (p *GitHubProvider) CreateCommit(ctx context.Context, branch, message strin
 	return newCommit.GetSHA(), nil
 }
 
+func (p *GitHubProvider) PullRequestExists(ctx context.Context, headBranch, baseBranch string) (bool, error) {
+	p.logger.Debug("PullRequestExists called", zap.String("headBranch", headBranch), zap.String("baseBranch", baseBranch))
+	opts := &github.PullRequestListOptions{
+		State: "open",
+		Head:  p.owner + ":" + headBranch,
+		Base:  baseBranch,
+		ListOptions: github.ListOptions{
+			PerPage: 1,
+		},
+	}
+
+	prs, _, err := p.client.PullRequests.List(ctx, p.owner, p.repo, opts)
+	if err != nil {
+		return false, err
+	}
+
+	return len(prs) > 0, nil
+}
+
 func (p *GitHubProvider) CreatePullRequest(ctx context.Context, cfg types.PRConfig) (*types.PullRequest, error) {
+	p.logger.Debug("CreatePullRequest called", zap.Any("cfg", cfg))
 	newPR := &github.NewPullRequest{
 		Title:               github.String(cfg.Title),
 		Head:                github.String(cfg.Branch),
@@ -220,6 +260,7 @@ func (p *GitHubProvider) CreatePullRequest(ctx context.Context, cfg types.PRConf
 }
 
 func (p *GitHubProvider) UpdatePullRequest(ctx context.Context, id string, updates PRUpdate) error {
+	p.logger.Debug("UpdatePullRequest called", zap.String("id", id), zap.Any("updates", updates))
 	// Parse ID as int
 	var prNumber int
 	fmt.Sscanf(id, "%d", &prNumber)
@@ -240,11 +281,13 @@ func (p *GitHubProvider) UpdatePullRequest(ctx context.Context, id string, updat
 }
 
 func (p *GitHubProvider) ClosePullRequest(ctx context.Context, id string, reason string) error {
+	p.logger.Debug("ClosePullRequest called", zap.String("id", id), zap.String("reason", reason))
 	state := "closed"
 	return p.UpdatePullRequest(ctx, id, PRUpdate{State: &state})
 }
 
 func (p *GitHubProvider) AssignPullRequest(ctx context.Context, id string, assignees []string) error {
+	p.logger.Debug("AssignPullRequest called", zap.String("id", id), zap.Strings("assignees", assignees))
 	var prNumber int
 	fmt.Sscanf(id, "%d", &prNumber)
 	_, _, err := p.client.Issues.AddAssignees(ctx, p.owner, p.repo, prNumber, assignees)
@@ -252,6 +295,7 @@ func (p *GitHubProvider) AssignPullRequest(ctx context.Context, id string, assig
 }
 
 func (p *GitHubProvider) RequestReviewers(ctx context.Context, id string, reviewers []string) error {
+	p.logger.Debug("RequestReviewers called", zap.String("id", id), zap.Strings("reviewers", reviewers))
 	var prNumber int
 	fmt.Sscanf(id, "%d", &prNumber)
 	req := github.ReviewersRequest{Reviewers: reviewers}
@@ -260,6 +304,7 @@ func (p *GitHubProvider) RequestReviewers(ctx context.Context, id string, review
 }
 
 func (p *GitHubProvider) AddLabels(ctx context.Context, id string, labels []string) error {
+	p.logger.Debug("AddLabels called", zap.String("id", id), zap.Strings("labels", labels))
 	var prNumber int
 	fmt.Sscanf(id, "%d", &prNumber)
 	_, _, err := p.client.Issues.AddLabelsToIssue(ctx, p.owner, p.repo, prNumber, labels)
@@ -267,6 +312,7 @@ func (p *GitHubProvider) AddLabels(ctx context.Context, id string, labels []stri
 }
 
 func (p *GitHubProvider) AddComment(ctx context.Context, id string, comment string) error {
+	p.logger.Debug("AddComment called", zap.String("id", id), zap.String("comment", comment))
 	var prNumber int
 	fmt.Sscanf(id, "%d", &prNumber)
 	c := &github.IssueComment{Body: &comment}

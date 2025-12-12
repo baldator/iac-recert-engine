@@ -3,6 +3,7 @@ package assign
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/baldator/iac-recert-engine/internal/config"
 	"github.com/baldator/iac-recert-engine/internal/plugin"
@@ -25,6 +26,8 @@ func NewResolver(cfg config.AssignmentConfig, pm *plugin.Manager, logger *zap.Lo
 }
 
 func (r *Resolver) Resolve(ctx context.Context, group types.FileGroup) (types.AssignmentResult, error) {
+	r.logger.Debug("resolving assignment for group", zap.String("group_id", group.ID), zap.String("strategy", group.Strategy), zap.Int("files", len(group.Files)))
+
 	// Determine strategy for this group
 	// If composite, we need to match rules.
 	// But FileGroup might contain files from different patterns if strategy was "single_pr".
@@ -37,9 +40,10 @@ func (r *Resolver) Resolve(ctx context.Context, group types.FileGroup) (types.As
 	// Let's assume we check the files in the group.
 
 	strategy := r.cfg.Strategy
-	// var rule *config.AssignmentRule
+	r.logger.Debug("using assignment strategy", zap.String("strategy", strategy))
 
 	if strategy == "composite" {
+		r.logger.Debug("composite strategy not fully implemented, using fallback assignees")
 		// Find matching rule
 		// We need to check if ANY file in the group matches the rule pattern?
 		// Or ALL files?
@@ -63,32 +67,41 @@ func (r *Resolver) Resolve(ctx context.Context, group types.FileGroup) (types.As
 
 	switch strategy {
 	case "static":
-		return types.AssignmentResult{
+		result := types.AssignmentResult{
 			Assignees: r.cfg.FallbackAssignees,
-		}, nil
+		}
+		r.logger.Debug("assigned using static strategy", zap.Strings("assignees", result.Assignees))
+		return result, nil
 	case "last_committer":
-		// Collect unique authors from files
-		authors := make(map[string]bool)
+		// Find the most recent committer
+		var lastAuthor string
+		var lastTime time.Time
 		for _, f := range group.Files {
-			if f.File.CommitAuthor != "" {
-				authors[f.File.CommitAuthor] = true
+			if f.File.CommitAuthor != "" && f.File.LastModified.After(lastTime) {
+				lastAuthor = f.File.CommitAuthor
+				lastTime = f.File.LastModified
 			}
 		}
 		var assignees []string
-		for a := range authors {
-			assignees = append(assignees, a)
+		if lastAuthor != "" {
+			assignees = []string{lastAuthor}
 		}
-		return types.AssignmentResult{
+		result := types.AssignmentResult{
 			Assignees: assignees,
-		}, nil
+		}
+		r.logger.Debug("assigned using last_committer strategy", zap.Strings("assignees", result.Assignees))
+		return result, nil
 	case "plugin":
 		// Call plugin
 		// We need PluginManager.
 		// r.pm.GetAssignmentPlugin(name).Resolve(...)
+		r.logger.Debug("plugin assignment strategy not implemented")
 		return types.AssignmentResult{}, fmt.Errorf("plugin assignment not implemented")
 	default:
-		return types.AssignmentResult{
+		result := types.AssignmentResult{
 			Assignees: r.cfg.FallbackAssignees,
-		}, nil
+		}
+		r.logger.Debug("assigned using fallback strategy", zap.Strings("assignees", result.Assignees))
+		return result, nil
 	}
 }

@@ -6,7 +6,7 @@ version: "1.0"
 # Repository settings
 repository:
   # URL of the repository to scan. Supports GitHub, Azure DevOps, and GitLab.
-  url: "https://github.com/example/infrastructure"
+  url: "https://github.com/baldator/iac-recert-engine"
   # Provider type: github, azure, or gitlab
   provider: "github"
 
@@ -23,7 +23,7 @@ global:
   # Enable debug logging
   verbose_logging: true
   # Maximum number of concurrent PRs to create (default: 5)
-  max_concurrent_prs: 5
+  max_concurrent_prs: 10 
   # Base branch for PRs (default: main)
   default_base_branch: "main"
 
@@ -41,6 +41,8 @@ patterns:
     # Number of days before recertification is required
     recertification_days: 180
     enabled: true
+    # Decorator to add to files when recertifying (optional)
+    decorator: "# Last Recertification: {timestamp}\n"
 
   - name: "k8s-manifests"
     description: "Kubernetes Manifests"
@@ -48,6 +50,15 @@ patterns:
       - "k8s/**/*.yaml"
     recertification_days: 90
     enabled: true
+    decorator: "# Last Recertification: {timestamp}\n"
+
+  - name: "iac-recert-engine"
+    description: "IAC Recertification Engine"
+    paths:
+      - "iac-recert-engine/**/*.go"
+    recertification_days: 1
+    enabled: true
+    decorator: "// Last Recertification: {timestamp}\n"
 
 # PR Grouping Strategy
 # Options: per_file, per_pattern, per_committer, single_pr, plugin

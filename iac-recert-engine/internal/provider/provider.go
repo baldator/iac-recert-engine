@@ -15,9 +15,11 @@ type GitProvider interface {
 	GetLastModificationDate(ctx context.Context, filePath string) (time.Time, types.Commit, error)
 
 	CreateBranch(ctx context.Context, name, baseRef string) error
+	BranchExists(ctx context.Context, name string) (bool, error)
 	CreateCommit(ctx context.Context, branch, message string, changes []types.Change) (string, error)
 
 	CreatePullRequest(ctx context.Context, cfg types.PRConfig) (*types.PullRequest, error)
+	PullRequestExists(ctx context.Context, headBranch, baseBranch string) (bool, error)
 	UpdatePullRequest(ctx context.Context, id string, updates PRUpdate) error
 	ClosePullRequest(ctx context.Context, id string, reason string) error
 

@@ -42,6 +42,7 @@ type Pattern struct {
 	Exclude             []string `yaml:"exclude" mapstructure:"exclude"`
 	RecertificationDays int      `yaml:"recertification_days" mapstructure:"recertification_days" validate:"required,min=1"`
 	Enabled             bool     `yaml:"enabled" mapstructure:"enabled"`
+	Decorator           string   `yaml:"decorator" mapstructure:"decorator"`
 }
 
 type PRStrategyConfig struct {

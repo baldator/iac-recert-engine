@@ -21,7 +21,10 @@ func NewChecker(logger *zap.Logger) *Checker {
 func (c *Checker) Check(files []types.FileInfo, patterns []config.Pattern, repoRoot string) ([]types.RecertCheckResult, error) {
 	var results []types.RecertCheckResult
 
-	for _, file := range files {
+	c.logger.Info("checking files for recertification", zap.Int("count", len(files)))
+	c.logger.Debug("starting recertification check", zap.String("repo_root", repoRoot), zap.Int("patterns", len(patterns)))
+
+	for i, file := range files {
 		// Calculate relative path for matching
 		relPath, err := filepath.Rel(repoRoot, file.Path)
 		if err != nil {
@@ -31,9 +34,11 @@ func (c *Checker) Check(files []types.FileInfo, patterns []config.Pattern, repoR
 		// Normalize for doublestar (forward slashes)
 		relPath = filepath.ToSlash(relPath)
 
+		c.logger.Debug("checking file", zap.Int("index", i+1), zap.String("file", relPath), zap.Time("last_modified", file.LastModified))
+
 		var matchedPattern *config.Pattern
-		for i := range patterns {
-			pattern := &patterns[i]
+		for j := range patterns {
+			pattern := &patterns[j]
 			if !pattern.Enabled {
 				continue
 			}
@@ -53,12 +58,14 @@ func (c *Checker) Check(files []types.FileInfo, patterns []config.Pattern, repoR
 				for _, ex := range pattern.Exclude {
 					m, err := doublestar.PathMatch(ex, relPath)
 					if err == nil && m {
+						c.logger.Debug("file matches exclusion pattern", zap.String("file", relPath), zap.String("exclude", ex))
 						excluded = true
 						break
 					}
 				}
 				if !excluded {
 					matchedPattern = pattern
+					c.logger.Debug("file matched pattern", zap.String("file", relPath), zap.String("pattern", pattern.Name))
 					break // Found the first matching pattern
 				}
 			}
@@ -67,6 +74,7 @@ func (c *Checker) Check(files []types.FileInfo, patterns []config.Pattern, repoR
 		if matchedPattern == nil {
 			// File doesn't match any pattern (shouldn't happen if Scanner uses same patterns,
 			// but possible if Scanner logic differs or if patterns changed)
+			c.logger.Debug("file did not match any pattern", zap.String("file", relPath))
 			continue
 		}
 
@@ -95,7 +103,7 @@ func (c *Checker) Check(files []types.FileInfo, patterns []config.Pattern, repoR
 
 		nextDueDate := file.LastModified.AddDate(0, 0, threshold)
 
-		results = append(results, types.RecertCheckResult{
+		result := types.RecertCheckResult{
 			File:        file,
 			PatternName: matchedPattern.Name,
 			DaysSince:   daysSince,
@@ -103,8 +111,20 @@ func (c *Checker) Check(files []types.FileInfo, patterns []config.Pattern, repoR
 			Priority:    priority,
 			NeedsRecert: needsRecert,
 			NextDueDate: nextDueDate,
-		})
+		}
+
+		results = append(results, result)
+
+		c.logger.Debug("file check result",
+			zap.String("file", relPath),
+			zap.String("pattern", matchedPattern.Name),
+			zap.Int("days_since", daysSince),
+			zap.Int("threshold", threshold),
+			zap.String("priority", priority),
+			zap.Bool("needs_recert", needsRecert),
+			zap.Time("next_due", nextDueDate))
 	}
 
+	c.logger.Info("recertification check completed", zap.Int("results", len(results)))
 	return results, nil
 }

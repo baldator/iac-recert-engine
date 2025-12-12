@@ -34,17 +34,24 @@ type PerFileStrategy struct {
 }
 
 func (s *PerFileStrategy) Group(results []types.RecertCheckResult) ([]types.FileGroup, error) {
+	s.logger.Debug("grouping files individually", zap.Int("total_results", len(results)))
+
 	var groups []types.FileGroup
 	for _, res := range results {
 		if !res.NeedsRecert {
+			s.logger.Debug("skipping file that doesn't need recertification", zap.String("file", res.File.Path))
 			continue
 		}
-		groups = append(groups, types.FileGroup{
+		group := types.FileGroup{
 			ID:       fmt.Sprintf("file-%s", res.File.Path),
 			Strategy: "per_file",
 			Files:    []types.RecertCheckResult{res},
-		})
+		}
+		groups = append(groups, group)
+		s.logger.Debug("created file group", zap.String("file", res.File.Path), zap.String("group_id", group.ID))
 	}
+
+	s.logger.Debug("per-file grouping completed", zap.Int("groups_created", len(groups)))
 	return groups, nil
 }
 
@@ -53,9 +60,12 @@ type PerPatternStrategy struct {
 }
 
 func (s *PerPatternStrategy) Group(results []types.RecertCheckResult) ([]types.FileGroup, error) {
+	s.logger.Debug("grouping files by pattern", zap.Int("total_results", len(results)))
+
 	groups := make(map[string][]types.RecertCheckResult)
 	for _, res := range results {
 		if !res.NeedsRecert {
+			s.logger.Debug("skipping file that doesn't need recertification", zap.String("file", res.File.Path))
 			continue
 		}
 		groups[res.PatternName] = append(groups[res.PatternName], res)
@@ -63,12 +73,16 @@ func (s *PerPatternStrategy) Group(results []types.RecertCheckResult) ([]types.F
 
 	var fileGroups []types.FileGroup
 	for pattern, files := range groups {
-		fileGroups = append(fileGroups, types.FileGroup{
+		group := types.FileGroup{
 			ID:       fmt.Sprintf("pattern-%s", pattern),
 			Strategy: "per_pattern",
 			Files:    files,
-		})
+		}
+		fileGroups = append(fileGroups, group)
+		s.logger.Debug("created pattern group", zap.String("pattern", pattern), zap.Int("files", len(files)), zap.String("group_id", group.ID))
 	}
+
+	s.logger.Debug("pattern grouping completed", zap.Int("groups_created", len(fileGroups)))
 	return fileGroups, nil
 }
 
@@ -77,9 +91,12 @@ type PerCommitterStrategy struct {
 }
 
 func (s *PerCommitterStrategy) Group(results []types.RecertCheckResult) ([]types.FileGroup, error) {
+	s.logger.Debug("grouping files by committer", zap.Int("total_results", len(results)))
+
 	groups := make(map[string][]types.RecertCheckResult)
 	for _, res := range results {
 		if !res.NeedsRecert {
+			s.logger.Debug("skipping file that doesn't need recertification", zap.String("file", res.File.Path))
 			continue
 		}
 		author := res.File.CommitAuthor
@@ -91,12 +108,16 @@ func (s *PerCommitterStrategy) Group(results []types.RecertCheckResult) ([]types
 
 	var fileGroups []types.FileGroup
 	for author, files := range groups {
-		fileGroups = append(fileGroups, types.FileGroup{
+		group := types.FileGroup{
 			ID:       fmt.Sprintf("author-%s", author),
 			Strategy: "per_committer",
 			Files:    files,
-		})
+		}
+		fileGroups = append(fileGroups, group)
+		s.logger.Debug("created committer group", zap.String("author", author), zap.Int("files", len(files)), zap.String("group_id", group.ID))
 	}
+
+	s.logger.Debug("committer grouping completed", zap.Int("groups_created", len(fileGroups)))
 	return fileGroups, nil
 }
 
@@ -105,18 +126,28 @@ type SinglePRStrategy struct {
 }
 
 func (s *SinglePRStrategy) Group(results []types.RecertCheckResult) ([]types.FileGroup, error) {
+	s.logger.Debug("grouping all files into single PR", zap.Int("total_results", len(results)))
+
 	var files []types.RecertCheckResult
 	for _, res := range results {
 		if res.NeedsRecert {
 			files = append(files, res)
+		} else {
+			s.logger.Debug("skipping file that doesn't need recertification", zap.String("file", res.File.Path))
 		}
 	}
+
 	if len(files) == 0 {
+		s.logger.Debug("no files need recertification, no groups created")
 		return nil, nil
 	}
-	return []types.FileGroup{{
+
+	group := types.FileGroup{
 		ID:       "all-files",
 		Strategy: "single_pr",
 		Files:    files,
-	}}, nil
+	}
+
+	s.logger.Debug("created single PR group", zap.Int("files", len(files)), zap.String("group_id", group.ID))
+	return []types.FileGroup{group}, nil
 }

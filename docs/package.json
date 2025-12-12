@@ -3,15 +3,15 @@
   "version": "1.0.0",
   "description": "Documentation for IaC Recertification Engine",
   "scripts": {
-    "serve": "gitbook serve",
-    "build": "gitbook build",
-    "install-plugins": "gitbook install",
-    "pdf": "gitbook pdf",
-    "epub": "gitbook epub",
-    "mobi": "gitbook mobi"
+    "serve": "docsify serve .",
+    "start": "docsify serve .",
+    "dev": "docsify serve . --port 3000",
+    "preview": "docsify serve . --open"
   },
   "dependencies": {},
-  "devDependencies": {},
+  "devDependencies": {
+    "docsify-cli": "^4.4.4"
+  },
   "engines": {
     "node": ">=14.0.0"
   },

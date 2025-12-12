@@ -28,9 +28,9 @@ This documentation is organized into the following sections:
 - **Troubleshooting**: Common issues and debugging tips
 - **Reference**: Changelog, license, and FAQ
 
-## Building the Documentation
+## Local Development
 
-This documentation is designed to be published as a GitBook. To build and serve locally:
+This documentation uses [Docsify](https://docsify.js.org/) for a lightweight, fast experience. To work on the documentation locally:
 
 ### Quick Start (Recommended)
 
@@ -38,45 +38,43 @@ This documentation is designed to be published as a GitBook. To build and serve 
 # Navigate to docs directory
 cd docs
 
-# Install dependencies and serve locally
-npm run install-plugins
+# Install Docsify CLI globally (optional)
+npm install -g docsify-cli
+
+# Serve documentation locally
+docsify serve .
+
+# Or use npm scripts
 npm run serve
-```
-
-### Manual Setup
-
-```bash
-# Install GitBook CLI globally (if not already installed)
-npm install -g gitbook-cli
-
-# Navigate to docs directory
-cd docs
-
-# Install GitBook plugins
-gitbook install
-
-# Serve the documentation locally (with live reload)
-gitbook serve
-
-# Build static files for production
-gitbook build
 ```
 
 ### Available Commands
 
-- `npm run serve` - Serve documentation locally with live reload
-- `npm run build` - Build static HTML files
-- `npm run install-plugins` - Install GitBook plugins
-- `npm run pdf` - Generate PDF version
-- `npm run epub` - Generate EPUB version
-- `npm run mobi` - Generate MOBI version
+- `npm run serve` - Serve documentation locally (default port 3000)
+- `npm run dev` - Serve on port 3000 explicitly
+- `npm run preview` - Serve and open in browser automatically
+
+### Manual Setup
+
+```bash
+# Install Docsify CLI globally
+npm install -g docsify-cli
+
+# Navigate to docs directory
+cd docs
+
+# Serve the documentation locally
+docsify serve .
+
+# The documentation will be available at http://localhost:3000
+```
 
 ## GitHub Pages Deployment
 
-The documentation is automatically built and deployed to GitHub Pages when changes are pushed to the `main` branch. The deployment workflow:
+The documentation is automatically deployed to GitHub Pages when changes are pushed to the `main` branch. The deployment workflow:
 
 1. **Triggers**: On push to `main` branch affecting `docs/` directory
-2. **Build Process**: Uses GitBook CLI to generate static HTML
+2. **Process**: Serves Markdown files directly using Docsify
 3. **Deployment**: Publishes to `https://baldator.github.io/iac-recert-engine/`
 
 ### Setup Requirements
@@ -90,20 +88,20 @@ Before the automatic deployment works, you need to enable GitHub Pages in your r
 
 ### Manual Deployment
 
-You can also trigger the documentation build manually:
+You can also trigger the documentation deployment manually:
 
 1. Go to the **Actions** tab in your GitHub repository
-2. Select **"Build and Deploy Documentation"** workflow
+2. Select **"Deploy Documentation"** workflow
 3. Click **"Run workflow"**
 
 ### Local Testing
 
-Before pushing changes, test the build locally:
+Before pushing changes, test the documentation locally:
 
 ```bash
 cd docs
-gitbook build
-# Check the _book/ directory for generated files
+docsify serve .
+# Visit http://localhost:3000 to preview
 ```
 
 ## Contributing to Documentation

@@ -2,6 +2,8 @@ package engine
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -10,6 +12,7 @@ import (
 	"time"
 
 	"github.com/baldator/iac-recert-engine/internal/assign"
+	"github.com/baldator/iac-recert-engine/internal/audit"
 	"github.com/baldator/iac-recert-engine/internal/config"
 	"github.com/baldator/iac-recert-engine/internal/plugin"
 	"github.com/baldator/iac-recert-engine/internal/pr"
@@ -23,6 +26,7 @@ import (
 type Engine struct {
 	cfg      config.Config
 	logger   *zap.Logger
+	auditor  *audit.Auditor
 	provider provider.GitProvider
 	scanner  *scan.Scanner
 	analyzer *scan.HistoryAnalyzer
@@ -35,13 +39,22 @@ type Engine struct {
 func NewEngine(cfg config.Config, logger *zap.Logger) (*Engine, error) {
 	ctx := context.Background()
 
-	// 1. Init Provider
+	// Generate run ID
+	runID, err := generateRunID()
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate run ID: %w", err)
+	}
+
+	// 1. Init Auditor
+	auditor := audit.NewAuditor(cfg.Audit, logger, runID)
+
+	// 2. Init Provider
 	prov, err := provider.NewProvider(ctx, cfg.Repository, cfg.Auth, logger)
 	if err != nil {
 		return nil, fmt.Errorf("failed to init provider: %w", err)
 	}
 
-	// 2. Init Components
+	// 3. Init Components
 	scanner := scan.NewScanner(cfg.Repository.URL, logger)
 	analyzer := scan.NewHistoryAnalyzer(prov, logger)
 	checker := scan.NewChecker(logger)
@@ -62,6 +75,7 @@ func NewEngine(cfg config.Config, logger *zap.Logger) (*Engine, error) {
 	return &Engine{
 		cfg:      cfg,
 		logger:   logger,
+		auditor:  auditor,
 		provider: prov,
 		scanner:  scanner,
 		analyzer: analyzer,
@@ -73,6 +87,11 @@ func NewEngine(cfg config.Config, logger *zap.Logger) (*Engine, error) {
 }
 
 func (e *Engine) Run(ctx context.Context) error {
+	e.auditor.LogEvent(ctx, audit.EventRunStart, "Starting recertification run", map[string]any{
+		"repository": e.cfg.Repository.URL,
+		"dry_run":    e.cfg.Global.DryRun,
+	}, nil)
+
 	e.logger.Info("starting recertification run")
 	e.logger.Debug("run configuration", zap.Bool("dry_run", e.cfg.Global.DryRun), zap.Bool("verbose_logging", e.cfg.Global.VerboseLogging))
 
@@ -82,6 +101,7 @@ func (e *Engine) Run(ctx context.Context) error {
 
 	files, scanDir, err := e.scanner.Scan(repoRoot, e.cfg.Patterns)
 	if err != nil {
+		e.auditor.LogEvent(ctx, audit.EventError, "File scan failed", nil, err)
 		return fmt.Errorf("scan failed: %w", err)
 	}
 	defer func() {
@@ -91,30 +111,46 @@ func (e *Engine) Run(ctx context.Context) error {
 			}
 		}
 	}()
+	e.auditor.LogEvent(ctx, audit.EventScanComplete, "File scan completed", map[string]any{
+		"files_scanned": len(files),
+		"scan_dir":      scanDir,
+	}, nil)
 	e.logger.Info("scanned files", zap.Int("count", len(files)), zap.String("scan_dir", scanDir))
 
 	// 2. Enrich
 	e.logger.Debug("starting history analysis phase")
 	enrichedFiles, err := e.analyzer.Enrich(ctx, files, scanDir)
 	if err != nil {
+		e.auditor.LogEvent(ctx, audit.EventError, "History analysis failed", nil, err)
 		return fmt.Errorf("history analysis failed: %w", err)
 	}
+	e.auditor.LogEvent(ctx, audit.EventEnrichComplete, "History analysis completed", map[string]any{
+		"files_enriched": len(enrichedFiles),
+	}, nil)
 	e.logger.Debug("history analysis completed", zap.Int("enriched_files", len(enrichedFiles)))
 
 	// 3. Check
 	e.logger.Debug("starting recertification check phase")
 	results, err := e.checker.Check(enrichedFiles, e.cfg.Patterns, scanDir)
 	if err != nil {
+		e.auditor.LogEvent(ctx, audit.EventError, "Recertification check failed", nil, err)
 		return fmt.Errorf("recertification check failed: %w", err)
 	}
+	e.auditor.LogEvent(ctx, audit.EventCheckComplete, "Recertification check completed", map[string]any{
+		"check_results": len(results),
+	}, nil)
 	e.logger.Debug("recertification check completed", zap.Int("check_results", len(results)))
 
 	// 4. Group
 	e.logger.Debug("starting grouping phase")
 	groups, err := e.strategy.Group(results)
 	if err != nil {
+		e.auditor.LogEvent(ctx, audit.EventError, "Grouping failed", nil, err)
 		return fmt.Errorf("grouping failed: %w", err)
 	}
+	e.auditor.LogEvent(ctx, audit.EventGroupComplete, "Grouping completed", map[string]any{
+		"groups_created": len(groups),
+	}, nil)
 	e.logger.Info("created groups", zap.Int("count", len(groups)))
 
 	// 5. Process Groups
@@ -123,6 +159,9 @@ func (e *Engine) Run(ctx context.Context) error {
 	failed := 0
 	for _, group := range groups {
 		if err := e.processGroup(ctx, group, scanDir, e.cfg.Patterns); err != nil {
+			e.auditor.LogEvent(ctx, audit.EventPRError, "Failed to process group", map[string]any{
+				"group_id": group.ID,
+			}, err)
 			e.logger.Error("failed to process group", zap.String("group_id", group.ID), zap.Error(err))
 			failed++
 		} else {
@@ -130,6 +169,10 @@ func (e *Engine) Run(ctx context.Context) error {
 		}
 	}
 
+	e.auditor.LogEvent(ctx, audit.EventRunEnd, "Recertification run completed", map[string]any{
+		"groups_processed": processed,
+		"groups_failed":    failed,
+	}, nil)
 	e.logger.Info("run completed", zap.Int("groups_processed", processed), zap.Int("groups_failed", failed))
 	return nil
 }
@@ -260,9 +303,29 @@ func (e *Engine) processGroup(ctx context.Context, group types.FileGroup, scanDi
 	e.logger.Debug("creating pull request", zap.String("title", prCfg.Title), zap.String("branch", prCfg.Branch))
 	pr, err := e.provider.CreatePullRequest(ctx, prCfg)
 	if err != nil {
+		e.auditor.LogEvent(ctx, audit.EventPRError, "Failed to create PR", map[string]any{
+			"group_id": group.ID,
+			"title":    prCfg.Title,
+			"branch":   prCfg.Branch,
+		}, err)
 		return fmt.Errorf("failed to create PR: %w", err)
 	}
 
+	e.auditor.LogEvent(ctx, audit.EventPRCreated, "PR created successfully", map[string]any{
+		"group_id": group.ID,
+		"pr_url":   pr.URL,
+		"title":    prCfg.Title,
+		"branch":   prCfg.Branch,
+	}, nil)
 	e.logger.Info("created PR", zap.String("url", pr.URL), zap.String("group_id", group.ID))
 	return nil
+}
+
+// generateRunID generates a unique run ID
+func generateRunID() (string, error) {
+	bytes := make([]byte, 8)
+	if _, err := rand.Read(bytes); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(bytes), nil
 }

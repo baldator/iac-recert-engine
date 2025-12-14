@@ -40,11 +40,6 @@
   - [**🧪 Testing**](development/testing.md)
   - [**🔨 Building**](development/building.md)
 
-- **Troubleshooting**
-  - [**❓ Common Issues**](troubleshooting/common-issues.md)
-  - [**🔍 Debugging**](troubleshooting/debugging.md)
-  - [**💬 Support**](troubleshooting/support.md)
-
 - **Reference**
   - [**📝 Changelog**](reference/changelog.md)
   - [**📄 License**](reference/license.md)

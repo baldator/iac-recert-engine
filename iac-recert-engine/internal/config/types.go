@@ -53,6 +53,7 @@ type PRStrategyConfig struct {
 
 type AssignmentConfig struct {
 	Strategy          string           `yaml:"strategy" mapstructure:"strategy" validate:"required,oneof=static last_committer plugin composite"`
+	PluginName        string           `yaml:"plugin_name" mapstructure:"plugin_name"`
 	Rules             []AssignmentRule `yaml:"rules" mapstructure:"rules"`
 	FallbackAssignees []string         `yaml:"fallback_assignees" mapstructure:"fallback_assignees"`
 }

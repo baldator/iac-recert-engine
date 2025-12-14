@@ -2,7 +2,6 @@ package assign
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/baldator/iac-recert-engine/internal/config"
@@ -93,10 +92,23 @@ func (r *Resolver) Resolve(ctx context.Context, group types.FileGroup) (types.As
 		return result, nil
 	case "plugin":
 		// Call plugin
-		// We need PluginManager.
-		// r.pm.GetAssignmentPlugin(name).Resolve(...)
-		r.logger.Debug("plugin assignment strategy not implemented")
-		return types.AssignmentResult{}, fmt.Errorf("plugin assignment not implemented")
+		plugin, err := r.pm.GetAssignmentPlugin(r.cfg.PluginName)
+		if err != nil {
+			r.logger.Error("failed to get assignment plugin", zap.String("plugin", r.cfg.PluginName), zap.Error(err))
+			return types.AssignmentResult{}, err
+		}
+		// Extract FileInfo from RecertCheckResult
+		var files []types.FileInfo
+		for _, f := range group.Files {
+			files = append(files, f.File)
+		}
+		result, err := plugin.Resolve(files)
+		if err != nil {
+			r.logger.Error("plugin resolve failed", zap.Error(err))
+			return types.AssignmentResult{}, err
+		}
+		r.logger.Debug("assigned using plugin strategy", zap.Strings("assignees", result.Assignees))
+		return result, nil
 	default:
 		result := types.AssignmentResult{
 			Assignees: r.cfg.FallbackAssignees,

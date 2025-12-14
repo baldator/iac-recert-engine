@@ -88,6 +88,14 @@ plugins:
     module: "cmdb"
     config:
       api_url: "https://cmdb.example.com"
+  servicenow_assignment:
+    enabled: false
+    type: "assignment"
+    module: "servicenow"
+    config:
+      api_url: "https://your-instance.service-now.com"
+      username: "${SERVICENOW_USERNAME}"
+      password: "${SERVICENOW_PASSWORD}"
 
 # Schedule (for CronJob generation reference)
 schedule:

@@ -4,6 +4,7 @@
 ice.exe
 ice
 test_*.txt
+iac-recert-engine/audit/*
 
 # Documentation build artifacts
 docs/node_modules/

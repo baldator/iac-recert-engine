@@ -2,17 +2,16 @@ FROM golang:1.24-alpine AS builder
 
 WORKDIR /app
 
-COPY go.mod go.sum ./
-RUN go mod download
-
 COPY . .
-COPY ../plugins/ ../plugins/
+RUN ls -la /app/
+WORKDIR /app/iac-recert-engine
+RUN go mod download
 RUN go build -o ice ./cmd/ice
 
 FROM alpine:latest
 
 WORKDIR /app
-COPY --from=builder /app/ice .
+COPY --from=builder /app/iac-recert-engine/ice .
 
 ENTRYPOINT ["./ice"]
 CMD ["run"]

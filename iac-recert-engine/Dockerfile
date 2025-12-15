@@ -6,6 +6,7 @@ COPY go.mod go.sum ./
 RUN go mod download
 
 COPY . .
+COPY ../plugins/ ../plugins/
 RUN go build -o ice ./cmd/ice
 
 FROM alpine:latest

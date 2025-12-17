@@ -6,7 +6,6 @@ import (
 
 	"github.com/baldator/iac-recert-engine/internal/config"
 	"github.com/baldator/iac-recert-engine/internal/types"
-	"github.com/bmatcuk/doublestar/v4"
 	"go.uber.org/zap"
 )
 
@@ -36,39 +35,10 @@ func (c *Checker) Check(files []types.FileInfo, patterns []config.Pattern, repoR
 
 		c.logger.Debug("checking file", zap.Int("index", i+1), zap.String("file", relPath), zap.Time("last_modified", file.LastModified))
 
-		var matchedPattern *config.Pattern
-		for j := range patterns {
-			pattern := &patterns[j]
-			if !pattern.Enabled {
-				continue
-			}
-
-			matched := false
-			for _, p := range pattern.Paths {
-				m, err := doublestar.PathMatch(p, relPath)
-				if err == nil && m {
-					matched = true
-					break
-				}
-			}
-
-			if matched {
-				// Check exclusions
-				excluded := false
-				for _, ex := range pattern.Exclude {
-					m, err := doublestar.PathMatch(ex, relPath)
-					if err == nil && m {
-						c.logger.Debug("file matches exclusion pattern", zap.String("file", relPath), zap.String("exclude", ex))
-						excluded = true
-						break
-					}
-				}
-				if !excluded {
-					matchedPattern = pattern
-					c.logger.Debug("file matched pattern", zap.String("file", relPath), zap.String("pattern", pattern.Name))
-					break // Found the first matching pattern
-				}
-			}
+		matchedPattern, err := FindMatchingPattern(patterns, relPath)
+		if err != nil {
+			c.logger.Warn("failed to match pattern", zap.String("file", relPath), zap.Error(err))
+			continue
 		}
 
 		if matchedPattern == nil {

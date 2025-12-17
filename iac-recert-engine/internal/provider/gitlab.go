@@ -123,7 +123,29 @@ func (p *GitLabProvider) CreateBranch(ctx context.Context, name, baseRef string)
 }
 
 func (p *GitLabProvider) CreateCommit(ctx context.Context, branch, message string, changes []types.Change) (string, error) {
-	return "", fmt.Errorf("CreateCommit not implemented for GitLab")
+	// Build actions for each change
+	actions := make([]*gitlab.CommitAction, len(changes))
+	for i, change := range changes {
+		actions[i] = &gitlab.CommitAction{
+			Action:   gitlab.FileCreate,
+			FilePath: change.Path,
+			Content:  change.Content,
+			Encoding: "text",
+		}
+	}
+
+	opts := &gitlab.CreateCommitOptions{
+		Branch:        &branch,
+		CommitMessage: &message,
+		Actions:       actions,
+	}
+
+	commit, _, err := p.client.Commits.CreateCommit(p.project, opts)
+	if err != nil {
+		return "", err
+	}
+
+	return commit.ID, nil
 }
 
 func (p *GitLabProvider) PullRequestExists(ctx context.Context, headBranch, baseBranch string) (bool, error) {
@@ -193,13 +215,32 @@ func (p *GitLabProvider) ClosePullRequest(ctx context.Context, id string, reason
 }
 
 func (p *GitLabProvider) AssignPullRequest(ctx context.Context, id string, assignees []string) error {
-	// GitLab supports multiple assignees but the API might be different
-	if len(assignees) > 0 {
-		// We need to get user IDs from usernames
-		// This is a simplified version - in practice you'd need to resolve usernames to IDs
-		return fmt.Errorf("AssignPullRequest: user ID resolution not implemented")
+	mrIID, err := strconv.ParseInt(id, 10, 64)
+	if err != nil {
+		return err
 	}
-	return nil
+
+	// Resolve usernames to user IDs
+	var assigneeIDs []int
+	for _, username := range assignees {
+		user, _, err := p.client.Users.GetUser(username, gitlab.GetUsersOptions{})
+		if err != nil {
+			p.logger.Warn("Failed to resolve username to user ID", zap.String("username", username), zap.Error(err))
+			continue
+		}
+		assigneeIDs = append(assigneeIDs, user.ID)
+	}
+
+	if len(assigneeIDs) == 0 {
+		return fmt.Errorf("no valid assignees found")
+	}
+
+	opts := &gitlab.UpdateMergeRequestOptions{
+		AssigneeIDs: &assigneeIDs,
+	}
+
+	_, _, err = p.client.MergeRequests.UpdateMergeRequest(p.project, mrIID, opts)
+	return err
 }
 
 func (p *GitLabProvider) RequestReviewers(ctx context.Context, id string, reviewers []string) error {

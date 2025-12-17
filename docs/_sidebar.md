@@ -39,8 +39,3 @@
   - [**🛠️ Development Setup**](development/setup.md)
   - [**🧪 Testing**](development/testing.md)
   - [**🔨 Building**](development/building.md)
-
-- **Reference**
-  - [**📝 Changelog**](reference/changelog.md)
-  - [**📄 License**](reference/license.md)
-  - [**❓ FAQ**](reference/faq.md)

@@ -152,23 +152,138 @@ func (p *AzureDevOpsProvider) GetLastModificationDate(ctx context.Context, fileP
 }
 
 func (p *AzureDevOpsProvider) BranchExists(ctx context.Context, name string) (bool, error) {
-	return false, fmt.Errorf("BranchExists not implemented for Azure DevOps")
+	path := fmt.Sprintf("git/repositories/%s/refs?filter=heads/%s&api-version=7.0", p.repo, name)
+
+	var result struct {
+		Count int `json:"count"`
+		Value []struct {
+			Name string `json:"name"`
+		} `json:"value"`
+	}
+
+	if err := p.doRequest(ctx, "GET", path, nil, &result); err != nil {
+		return false, err
+	}
+
+	return result.Count > 0, nil
 }
 
 func (p *AzureDevOpsProvider) CreateBranch(ctx context.Context, name, baseRef string) error {
-	// 1. Get base ref
-	// 2. Create ref
-	// Simplified: Not implemented fully
-	return fmt.Errorf("CreateBranch not implemented for Azure DevOps")
+	// 1. Get base ref SHA
+	basePath := fmt.Sprintf("git/repositories/%s/refs?filter=heads/%s&api-version=7.0", p.repo, baseRef)
+	var baseResult struct {
+		Value []struct {
+			ObjectId string `json:"objectId"`
+		} `json:"value"`
+	}
+
+	if err := p.doRequest(ctx, "GET", basePath, nil, &baseResult); err != nil {
+		return err
+	}
+
+	if len(baseResult.Value) == 0 {
+		return fmt.Errorf("base ref %s not found", baseRef)
+	}
+
+	// 2. Create new ref
+	path := fmt.Sprintf("git/repositories/%s/refs?api-version=7.0", p.repo)
+	body := []map[string]interface{}{
+		{
+			"name":        "refs/heads/" + name,
+			"oldObjectId": "0000000000000000000000000000000000000000",
+			"newObjectId": baseResult.Value[0].ObjectId,
+		},
+	}
+
+	return p.doRequest(ctx, "POST", path, body, nil)
 }
 
 func (p *AzureDevOpsProvider) CreateCommit(ctx context.Context, branch, message string, changes []types.Change) (string, error) {
-	// Pushes endpoint
-	return "", fmt.Errorf("CreateCommit not implemented for Azure DevOps")
+	// Use pushes API to create commit with changes
+	path := fmt.Sprintf("git/repositories/%s/pushes?api-version=7.0", p.repo)
+
+	// Get current branch ref
+	refPath := fmt.Sprintf("git/repositories/%s/refs?filter=heads/%s&api-version=7.0", p.repo, branch)
+	var refResult struct {
+		Value []struct {
+			ObjectId string `json:"objectId"`
+		} `json:"value"`
+	}
+
+	if err := p.doRequest(ctx, "GET", refPath, nil, &refResult); err != nil {
+		return "", err
+	}
+
+	if len(refResult.Value) == 0 {
+		return "", fmt.Errorf("branch %s not found", branch)
+	}
+
+	// Build commits array
+	commits := []map[string]interface{}{
+		{
+			"comment": message,
+			"changes": func() []map[string]interface{} {
+				var result []map[string]interface{}
+				for _, change := range changes {
+					result = append(result, map[string]interface{}{
+						"changeType": "add",
+						"item": map[string]interface{}{
+							"path": change.Path,
+						},
+						"newContent": map[string]interface{}{
+							"content":     change.Content,
+							"contentType": "rawtext",
+						},
+					})
+				}
+				return result
+			}(),
+		},
+	}
+
+	body := map[string]interface{}{
+		"refUpdates": []map[string]interface{}{
+			{
+				"name":        "refs/heads/" + branch,
+				"oldObjectId": refResult.Value[0].ObjectId,
+			},
+		},
+		"commits": commits,
+	}
+
+	var result struct {
+		PushId int `json:"pushId"`
+		Commits []struct {
+			CommitId string `json:"commitId"`
+		} `json:"commits"`
+	}
+
+	if err := p.doRequest(ctx, "POST", path, body, &result); err != nil {
+		return "", err
+	}
+
+	if len(result.Commits) == 0 {
+		return "", fmt.Errorf("no commits created")
+	}
+
+	return result.Commits[0].CommitId, nil
 }
 
 func (p *AzureDevOpsProvider) PullRequestExists(ctx context.Context, headBranch, baseBranch string) (bool, error) {
-	return false, fmt.Errorf("PullRequestExists not implemented for Azure DevOps")
+	path := fmt.Sprintf("git/repositories/%s/pullrequests?sourceRefName=refs/heads/%s&targetRefName=refs/heads/%s&status=active&api-version=7.0", p.repo, headBranch, baseBranch)
+
+	var result struct {
+		Count int `json:"count"`
+		Value []struct {
+			PullRequestId int `json:"pullRequestId"`
+		} `json:"value"`
+	}
+
+	if err := p.doRequest(ctx, "GET", path, nil, &result); err != nil {
+		return false, err
+	}
+
+	return result.Count > 0, nil
 }
 
 func (p *AzureDevOpsProvider) CreatePullRequest(ctx context.Context, cfg types.PRConfig) (*types.PullRequest, error) {
@@ -203,19 +318,44 @@ func (p *AzureDevOpsProvider) CreatePullRequest(ctx context.Context, cfg types.P
 }
 
 func (p *AzureDevOpsProvider) UpdatePullRequest(ctx context.Context, id string, updates PRUpdate) error {
-	return fmt.Errorf("UpdatePullRequest not implemented for Azure DevOps")
+	path := fmt.Sprintf("git/repositories/%s/pullrequests/%s?api-version=7.0", p.repo, id)
+
+	body := make(map[string]interface{})
+	if updates.Title != nil {
+		body["title"] = *updates.Title
+	}
+	if updates.Description != nil {
+		body["description"] = *updates.Description
+	}
+	if updates.State != nil {
+		body["status"] = *updates.State
+	}
+
+	return p.doRequest(ctx, "PATCH", path, body, nil)
 }
 
 func (p *AzureDevOpsProvider) ClosePullRequest(ctx context.Context, id string, reason string) error {
-	return fmt.Errorf("ClosePullRequest not implemented for Azure DevOps")
+	status := "abandoned" // Azure DevOps uses "abandoned" for closed PRs
+	return p.UpdatePullRequest(ctx, id, PRUpdate{State: &status})
 }
 
 func (p *AzureDevOpsProvider) AssignPullRequest(ctx context.Context, id string, assignees []string) error {
-	return fmt.Errorf("AssignPullRequest not implemented for Azure DevOps")
+	// In Azure DevOps, assignment is handled through reviewers
+	return p.RequestReviewers(ctx, id, assignees)
 }
 
 func (p *AzureDevOpsProvider) RequestReviewers(ctx context.Context, id string, reviewers []string) error {
-	return fmt.Errorf("RequestReviewers not implemented for Azure DevOps")
+	path := fmt.Sprintf("git/repositories/%s/pullrequests/%s/reviewers?api-version=7.0", p.repo, id)
+
+	body := make([]map[string]interface{}, len(reviewers))
+	for i, reviewer := range reviewers {
+		body[i] = map[string]interface{}{
+			"uniqueName": reviewer,
+			"vote":       0, // 0 = no vote, 10 = approved, -10 = rejected
+		}
+	}
+
+	return p.doRequest(ctx, "PUT", path, body, nil)
 }
 
 func (p *AzureDevOpsProvider) AddLabels(ctx context.Context, id string, labels []string) error {
@@ -223,5 +363,15 @@ func (p *AzureDevOpsProvider) AddLabels(ctx context.Context, id string, labels [
 }
 
 func (p *AzureDevOpsProvider) AddComment(ctx context.Context, id string, comment string) error {
-	return fmt.Errorf("AddComment not implemented for Azure DevOps")
+	path := fmt.Sprintf("git/repositories/%s/pullrequests/%s/threads?api-version=7.0", p.repo, id)
+
+	body := map[string]interface{}{
+		"comments": []map[string]interface{}{
+			{
+				"content": comment,
+			},
+		},
+	}
+
+	return p.doRequest(ctx, "POST", path, body, nil)
 }

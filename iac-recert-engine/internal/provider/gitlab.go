@@ -124,13 +124,15 @@ func (p *GitLabProvider) CreateBranch(ctx context.Context, name, baseRef string)
 
 func (p *GitLabProvider) CreateCommit(ctx context.Context, branch, message string, changes []types.Change) (string, error) {
 	// Build actions for each change
-	actions := make([]*gitlab.CommitAction, len(changes))
+	actions := make([]*gitlab.CommitActionOptions, len(changes))
 	for i, change := range changes {
-		actions[i] = &gitlab.CommitAction{
-			Action:   gitlab.FileCreate,
-			FilePath: change.Path,
-			Content:  change.Content,
-			Encoding: "text",
+		action := gitlab.FileActionValue("create")
+		encoding := "text"
+		actions[i] = &gitlab.CommitActionOptions{
+			Action:   &action,
+			FilePath: &change.Path,
+			Content:  &change.Content,
+			Encoding: &encoding,
 		}
 	}
 
@@ -221,14 +223,21 @@ func (p *GitLabProvider) AssignPullRequest(ctx context.Context, id string, assig
 	}
 
 	// Resolve usernames to user IDs
-	var assigneeIDs []int
+	var assigneeIDs []int64
 	for _, username := range assignees {
-		user, _, err := p.client.Users.GetUser(username, gitlab.GetUsersOptions{})
-		if err != nil {
+		// Search for user by username
+		opts := &gitlab.ListUsersOptions{
+			Username: &username,
+			ListOptions: gitlab.ListOptions{
+				PerPage: 1,
+			},
+		}
+		users, _, err := p.client.Users.ListUsers(opts)
+		if err != nil || len(users) == 0 {
 			p.logger.Warn("Failed to resolve username to user ID", zap.String("username", username), zap.Error(err))
 			continue
 		}
-		assigneeIDs = append(assigneeIDs, user.ID)
+		assigneeIDs = append(assigneeIDs, users[0].ID)
 	}
 
 	if len(assigneeIDs) == 0 {

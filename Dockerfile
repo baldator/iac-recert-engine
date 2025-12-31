@@ -3,7 +3,6 @@ FROM golang:1.24-alpine AS builder
 WORKDIR /app
 
 COPY . .
-RUN ls -la /app/
 WORKDIR /app/iac-recert-engine
 RUN go mod download
 RUN go build -o ice ./cmd/ice

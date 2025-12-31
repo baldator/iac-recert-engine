@@ -22,6 +22,7 @@ plugins:
       api_url: "https://your-instance.service-now.com"
       username: "${SERVICENOW_USERNAME}"
       password: "${SERVICENOW_PASSWORD}"
+      app_regex: "application\\s*=\\s*[\"']([^\"']+)[\"']"  # optional, defaults to application = "value" pattern
 
 assignment:
   strategy: "plugin"

@@ -49,7 +49,7 @@ func NewServiceNowPlugin(logger *zap.Logger) api.AssignmentPlugin {
 	return &ServiceNowPlugin{
 		logger:     logger,
 		httpClient: &http.Client{},
-		appRegex:   regexp.MustCompile(`application\s*=\s*["']([^"']+)["']`),
+		appRegex:   regexp.MustCompile(`application\s*=\s*["']([^"']+)["']`), // default regex
 	}
 }
 
@@ -57,6 +57,16 @@ func (p *ServiceNowPlugin) Init(config map[string]string) error {
 	p.apiURL = config["api_url"]
 	p.username = config["username"]
 	p.password = config["password"]
+
+	// Configure app regex
+	if appRegexStr := config["app_regex"]; appRegexStr != "" {
+		appRegex, err := regexp.Compile(appRegexStr)
+		if err != nil {
+			return fmt.Errorf("invalid app_regex pattern: %w", err)
+		}
+		p.appRegex = appRegex
+	}
+
 	return nil
 }
 

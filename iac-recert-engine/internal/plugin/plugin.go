@@ -6,6 +6,7 @@ import (
 	"github.com/baldator/iac-recert-engine/internal/config"
 	"github.com/baldator/iac-recert-engine/internal/types"
 	"github.com/baldator/iac-recert-engine/pkg/api"
+	"github.com/baldator/iac-recert-csvlookup-plugin/csvlookup"
 	"github.com/baldator/iac-recert-servicenow-plugin/servicenow"
 	"go.uber.org/zap"
 )
@@ -90,6 +91,12 @@ func NewManager(configs config.PluginConfigs, logger *zap.Logger) (*Manager, err
 				return nil, fmt.Errorf("servicenow plugin must be of type assignment")
 			}
 			apiPlugin := servicenow.NewServiceNowPlugin(logger)
+			plugin = &assignmentPluginWrapper{apiPlugin: apiPlugin}
+		case "csvlookup":
+			if cfg.Type != "assignment" {
+				return nil, fmt.Errorf("csvlookup plugin must be of type assignment")
+			}
+			apiPlugin := csvlookup.NewCSVLookupPlugin(logger)
 			plugin = &assignmentPluginWrapper{apiPlugin: apiPlugin}
 		default:
 			return nil, fmt.Errorf("unknown plugin module: %s", cfg.Module)

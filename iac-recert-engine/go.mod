@@ -5,6 +5,7 @@ go 1.24.0
 toolchain go1.24.11
 
 require (
+	github.com/baldator/iac-recert-csvlookup-plugin v0.0.0
 	github.com/baldator/iac-recert-servicenow-plugin v0.0.0
 	github.com/bmatcuk/doublestar/v4 v4.9.1
 	github.com/go-playground/validator/v10 v10.28.0
@@ -49,3 +50,4 @@ require (
 )
 
 replace github.com/baldator/iac-recert-servicenow-plugin => ../plugins/servicenow
+replace github.com/baldator/iac-recert-csvlookup-plugin => ../plugins/csvlookup

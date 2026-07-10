@@ -1,10 +1,9 @@
 module github.com/baldator/iac-recert-engine
 
-go 1.24.0
-
-toolchain go1.24.11
+go 1.25.0
 
 require (
+	github.com/aws/aws-sdk-go v1.55.8
 	github.com/baldator/iac-recert-csvlookup-plugin v0.0.0
 	github.com/baldator/iac-recert-servicenow-plugin v0.0.0
 	github.com/bmatcuk/doublestar/v4 v4.9.1
@@ -13,12 +12,12 @@ require (
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/viper v1.21.0
 	github.com/stretchr/testify v1.11.1
+	gitlab.com/gitlab-org/api/client-go v1.8.1
 	go.uber.org/zap v1.27.1
 	golang.org/x/oauth2 v0.34.0
 )
 
 require (
-	github.com/aws/aws-sdk-go v1.55.8 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/fsnotify/fsnotify v1.9.0 // indirect
 	github.com/gabriel-vasile/mimetype v1.4.10 // indirect
@@ -39,15 +38,15 @@ require (
 	github.com/spf13/cast v1.10.0 // indirect
 	github.com/spf13/pflag v1.0.10 // indirect
 	github.com/subosito/gotenv v1.6.0 // indirect
-	gitlab.com/gitlab-org/api/client-go v1.8.1 // indirect
 	go.uber.org/multierr v1.10.0 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
-	golang.org/x/crypto v0.45.0 // indirect
-	golang.org/x/sys v0.38.0 // indirect
-	golang.org/x/text v0.31.0 // indirect
+	golang.org/x/crypto v0.52.0 // indirect
+	golang.org/x/sys v0.45.0 // indirect
+	golang.org/x/text v0.37.0 // indirect
 	golang.org/x/time v0.14.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
 replace github.com/baldator/iac-recert-servicenow-plugin => ../plugins/servicenow
+
 replace github.com/baldator/iac-recert-csvlookup-plugin => ../plugins/csvlookup
